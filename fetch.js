@@ -66,9 +66,7 @@ function getImageUrls(config) {
 
 function saveImages(imageUrls, config) {
 	var deferred = new Deferred();
-	var requested = 0;
 	var completed = 0;
-	var concurrently = 3;
 	var total = imageUrls.length;
 
 	function fetchImage( u ) {
@@ -85,9 +83,9 @@ function saveImages(imageUrls, config) {
 
 		return deferred;
 	}
-	
-	function makeNextRequest() {
-		fetchImage( imageUrls[requested] ).done(function() {
+
+	imageUrls.forEach(function(imgUrl) {
+		fetchImage( imgUrl ).done(function() {
 			completed++;
 
 			if ( completed == total ) {
@@ -98,20 +96,10 @@ function saveImages(imageUrls, config) {
 				deferred.notify();	
 			}
 		});
-
-		requested++;
-	}
-
-	var initialRequests = Math.min( concurrently, total );
-
-	while (initialRequests--) {
-		makeNextRequest();
-	}
+	});
 
 	return deferred.progress(function() {
-		if ( requested < total ) {
-			makeNextRequest();
-		}
+		console.log( "Completed", completed, "of", total );
 	});
 }
 
