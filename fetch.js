@@ -40,6 +40,7 @@ function getImageUrls(config) {
 			json: true	
 		}, function(err, response, data) {
 			if ( err || data.stat != "ok" ) {
+				console.log( "Failed", err || data.stat );
 				namesDeferred.reject( err || data.stat );
 				return;
 			}
@@ -74,12 +75,19 @@ function saveImages(imageUrls, config) {
 		var filename = url.parse( u ).path.match(/[^\/]+$/)[0];
 		console.log("Saving", u, "to", filename);
 
-		request.get( u, function() {
+		var req = request.get( u, function(err) {
+			if ( err ) {
+				console.log( "Failed", err );
+				deferred.reject( err );
+				return;
+			}
 			console.log("Image downloaded", u);
 			deferred.resolve();
-		}).pipe( fs.createWriteStream( path.join(config.location, filename), {
-			mode: 0600
-		}));
+		}).on('request', function() {
+			req.pipe( fs.createWriteStream( path.join(config.location, filename), {
+				mode: 0600
+			}));
+		});
 
 		return deferred;
 	}
