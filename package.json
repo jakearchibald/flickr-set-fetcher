@@ -1,0 +1,22 @@
+{
+  "name": "flickr-bg-fetch",
+  "version": "0.1.0",
+  "description": "One-way sync a flickr set to a folder",
+  "main": "fetch.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jakearchibald/flickr-set-fetcher.git"
+  },
+  "keywords": [
+    "flickr",
+    "sync",
+    "folder"
+  ],
+  "dependencies": {
+    "Deferred": "0.1.x",
+    "request": "2.x.x"
+  },
+  "author": "Jake Archibald",
+  "license": "BSD",
+  "engine": "node >= 0.8.1"
+}
