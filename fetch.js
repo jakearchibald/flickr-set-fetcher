@@ -70,7 +70,7 @@ function saveImages(imageUrls, config) {
 	var completed = 0;
 	var total = imageUrls.length;
 
-	function fetchImage( u ) {
+	function fetchImage(u) {
 		var deferred = new Deferred();
 		var filename = url.parse( u ).path.match(/[^\/]+$/)[0];
 		console.log("Saving", u, "to", filename);
@@ -81,7 +81,7 @@ function saveImages(imageUrls, config) {
 				deferred.reject( err );
 				return;
 			}
-			console.log("Image downloaded", u);
+			console.log( "Image downloaded", u );
 			deferred.resolve();
 		}).on('request', function() {
 			req.pipe( fs.createWriteStream( path.join(config.location, filename), {
@@ -134,8 +134,8 @@ function deleteExtraneous( imageUrls, config ) {
 	});
 }
 
-configFile.load().done(function(config) {
-	getImageUrls( config ).pipe(function( imageUrls ) {
+configFile.load().pipe(function(config) {
+	return getImageUrls( config ).pipe(function( imageUrls ) {
 		deleteExtraneous( imageUrls, config );
 		return filterExistingFiles( imageUrls, config );
 	}).pipe(function( imageUrls ) {
