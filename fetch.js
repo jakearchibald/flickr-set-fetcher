@@ -83,7 +83,7 @@ function saveImages(imageUrls, config) {
 			}
 			console.log( "Image downloaded", u );
 			deferred.resolve();
-		}).on('request', function() {
+		}).on('response', function() {
 			req.pipe( fs.createWriteStream( path.join(config.location, filename), {
 				mode: 0600
 			}));
