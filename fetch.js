@@ -29,7 +29,7 @@ var configFile = (function() {
 
 function getImageUrls(config) {
 	var perPage = 100;
-	var baseUrl = "http://api.flickr.com/services/rest/?method=flickr.photosets.getPhotos&api_key=%s&photoset_id=%s&extras=url_o&per_page=" + perPage + "&page=%d&format=json&nojsoncallback=1";
+	var baseUrl = "https://api.flickr.com/services/rest/?method=flickr.photosets.getPhotos&api_key=%s&photoset_id=%s&extras=url_o&per_page=" + perPage + "&page=%d&format=json&nojsoncallback=1";
 	var imageUrls = [];
 	var page = 1;
 	var namesDeferred = new Deferred();
