@@ -40,7 +40,7 @@ function getImageUrls(config) {
 			json: true	
 		}, function(err, response, data) {
 			if ( err || data.stat != "ok" ) {
-				console.log( "Failed", err || data.stat );
+				console.log( "Failed", err || data.message );
 				namesDeferred.reject( err || data.stat );
 				return;
 			}
