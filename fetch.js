@@ -1,144 +1,129 @@
-var Deferred = require('Deferred');
-var fs = require('fs');
-var request = require('request');
-var util = require('util');
-var url = require('url');
-var path = require('path');
+const fs = require('fs-promise')
+const request = require('request');
+const util = require('util');
+const url = require('url');
+const path = require('path');
 
-var configFile = (function() {
-	var configPath = __dirname + '/config.json';
-	var config;
+const configFile = fs.readFile(__dirname + '/config.json').then(data => JSON.parse(data));
 
-	return {
-		load: function() {
-			console.log("Loading config");
-			var deferred = new Deferred();
-			
-			fs.readFile(configPath, function(err, data) {
-				if ( data ) {
-					console.log("Config loaded");
-					config = JSON.parse( data );
-				}
-				deferred.resolve( config );
-			});
-
-			return deferred;
-		}
-	};
-})();
-
-function getImageUrls(config) {
-	var perPage = 100;
-	var baseUrl = "https://api.flickr.com/services/rest/?method=flickr.photosets.getPhotos&api_key=%s&photoset_id=%s&extras=url_o&per_page=" + perPage + "&page=%d&format=json&nojsoncallback=1";
-	var imageUrls = [];
-	var page = 1;
-	var namesDeferred = new Deferred();
-
-	function fetchPage() {
-		request.get({
-			url: util.format( baseUrl, config.apiKey, config.set, page ),
-			json: true	
-		}, function(err, response, data) {
-			if ( err || data.stat != "ok" ) {
-				console.log( "Failed", err || data.message );
-				namesDeferred.reject( err || data.stat );
+function requestJson(url) {
+	return new Promise((resolve, reject) => {
+		request.get({url, json: true}, (err, response, data) => {
+			if (err) {
+				reject(err);
 				return;
 			}
+			resolve(data);
+		})
+	});
+}
 
-			imageUrls.push.apply( imageUrls, data.photoset.photo.map(function(photo) {
-				return photo.url_o;
-			}));
+async function getImageUrls(config) {
+	const perPage = 100;
+	const baseUrl = "https://api.flickr.com/services/rest/?method=flickr.photosets.getPhotos&api_key=%s&photoset_id=%s&extras=url_o&per_page=" + perPage + "&page=%d&format=json&nojsoncallback=1";
+	const imageUrls = [];
+	let page = 1;
 
-			if (data.photoset.total > page * perPage) {
-				namesDeferred.notify();
-			}
-			else {
-				namesDeferred.resolve( imageUrls );
-			}
-		});
-	}
+	while (true) {
+		const data = await requestJson(util.format(baseUrl, config.apiKey, config.set, page));
+		const urls = data.photoset.photo.map(p => p.url_o);
+		imageUrls.push(...urls);
 
-	fetchPage();
-	return namesDeferred.progress(function() {
+		if (imageUrls.length == data.photoset.total) break;
 		page++;
-		fetchPage();
-	});
-}
-
-function saveImages(imageUrls, config) {
-	var deferred = new Deferred();
-	var completed = 0;
-	var total = imageUrls.length;
-
-	function fetchImage(u) {
-		var deferred = new Deferred();
-		var filename = url.parse( u ).path.match(/[^\/]+$/)[0];
-		console.log("Saving", u, "to", filename);
-
-		var req = request.get( u, function(err) {
-			if ( err ) {
-				console.log( "Failed", err );
-				deferred.reject( err );
-				return;
-			}
-			console.log( "Image downloaded", u );
-			deferred.resolve();
-		}).on('response', function() {
-			req.pipe( fs.createWriteStream( path.join(config.location, filename), {
-				mode: 0600
-			}));
-		});
-
-		return deferred;
 	}
 
-	imageUrls.forEach(function(imgUrl) {
-		fetchImage( imgUrl ).done(function() {
-			completed++;
+	return imageUrls;
+}
 
-			if ( completed == total ) {
-				console.log("All images fetched & saved");
-				deferred.resolve();
+function queue(tasks, {
+	concurrentTasks = 10
+}={}) {
+	return new Promise((resolve, reject) => {
+		let i = 0;
+		let runningTasks = 0;
+		
+		async function nextTask() {
+			const task = tasks[i];
+			i++;
+
+			if (!task) return;
+
+			runningTasks++;
+			
+			try {
+				await task();
 			}
-			else {
-				deferred.notify();	
+			catch (err) {
+				reject(err);
+				return;
 			}
-		});
-	});
 
-	return deferred.progress(function() {
-		console.log( "Completed", completed, "of", total );
-	});
-}
+			runningTasks--;
 
-function filterExistingFiles( imageUrls, config ) {
-	console.log("Filtering against what we already have");
-	var files = fs.readdirSync( config.location );
+			if (runningTasks == 0 && i == tasks.length) {
+				resolve();
+				return;
+			}
 
-	return imageUrls.filter(function(u) {
-		var keep = files.indexOf( url.parse( u ).path.match(/[^\/]+$/)[0] ) == -1;
-		if ( !keep ) {
-			console.log( "Skipping", u );
+			if (tasks[i]) nextTask();
 		}
-		return keep;
+
+		for (let i = 0; i < concurrentTasks; i++) nextTask();
+	})
+}
+
+function urlToFilename(u) {
+	return url.parse(u).path.match(/[^\/]+$/)[0];
+}
+
+function saveUrl(u, destination) {
+	return new Promise((resolve, reject) => {
+		const filename = urlToFilename(u);
+		console.log('Fetching', filename);
+
+		request.get(u)
+			.on('error', err => {
+				console.log('Failed to fetch', filename, err);
+				reject(err);
+			})
+			.on('end', () => {
+				console.log('Fetched', filename);
+				resolve();
+			})
+			.pipe(fs.createWriteStream(path.join(destination, filename), {mode: 0600}));
 	});
 }
 
-function deleteExtraneous( imageUrls, config ) {
-	var urls = imageUrls.join();
-	var files = fs.readdirSync( config.location ).forEach(function(file) {
-		if ( urls.indexOf( file ) == -1 ) {
-			console.log( "Deleting", file );
-			fs.unlink( path.join( config.location, file ) );
+async function deleteUnexpectedFiles(imageUrls, dir) {
+	const expectedFiles = imageUrls.map(u => urlToFilename(u));
+	const files = await fs.readdir(dir);
+	const tasks = [];
+
+	for (const file of files) {
+		if (!expectedFiles.includes(file)) {
+			console.log("Deleting", file);
+			tasks.push(fs.unlink(path.join(dir, file)))
 		}
+	}
+
+	return Promise.all(tasks);
+}
+
+async function filterAlreadySaved(imageUrls, dir) {
+	const files = await fs.readdir(dir);
+
+	return imageUrls.filter(imgUrl => {
+		const filename = urlToFilename(imgUrl);
+		return !files.includes(filename);
 	});
 }
 
-configFile.load().pipe(function(config) {
-	return getImageUrls( config ).pipe(function( imageUrls ) {
-		deleteExtraneous( imageUrls, config );
-		return filterExistingFiles( imageUrls, config );
-	}).pipe(function( imageUrls ) {
-		return saveImages( imageUrls, config );
-	});
+configFile.then(async config => {
+	const imageUrls = await getImageUrls(config);
+	await deleteUnexpectedFiles(imageUrls, config.location);
+	const imagesToFetch = await filterAlreadySaved(imageUrls, config.location);
+	console.log(`Fetching ${imagesToFetch.length} images`);
+
+	await queue(imagesToFetch.map(imageUrl => () => saveUrl(imageUrl, config.location)));
 });

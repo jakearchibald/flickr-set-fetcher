@@ -7,16 +7,12 @@
     "type": "git",
     "url": "git://github.com/jakearchibald/flickr-set-fetcher.git"
   },
-  "keywords": [
-    "flickr",
-    "sync",
-    "folder"
-  ],
-  "dependencies": {
-    "Deferred": "0.1.x",
-    "request": "2.x.x"
-  },
   "author": "Jake Archibald",
-  "license": "BSD",
-  "engine": "node >= 0.8.1"
+  "private": true,
+  "engine": "node >= 0.8.1",
+  "dependencies": {
+    "fs-extra": "^2.1.2",
+    "fs-promise": "^2.0.2",
+    "request": "^2.81.0"
+  }
 }
